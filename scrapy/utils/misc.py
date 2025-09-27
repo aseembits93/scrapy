@@ -61,12 +61,10 @@ def load_object(path: str | Callable[..., Any]) -> Any:
             f"Unexpected argument type, expected string or object, got: {type(path)}"
         )
 
-    try:
-        dot = path.rindex(".")
-    except ValueError:
+    module, sep, name = path.rpartition(".")
+    if not sep:
         raise ValueError(f"Error loading object '{path}': not a full path")
 
-    module, name = path[:dot], path[dot + 1 :]
     mod = import_module(module)
 
     try:
