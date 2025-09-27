@@ -5,6 +5,7 @@ originated it.
 
 from __future__ import annotations
 
+import functools
 import warnings
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, cast
@@ -26,6 +27,29 @@ if TYPE_CHECKING:
 
     from scrapy.crawler import Crawler
     from scrapy.settings import BaseSettings
+
+    # Local schemes and referrer policy constants as before
+    LOCAL_SCHEMES: tuple[str, ...] = (
+        "about",
+        "blob",
+        "data",
+        "filesystem",
+    )
+    
+    _policy_classes: dict[str, type[ReferrerPolicy]] = {
+        p.name: p
+        for p in (
+            NoReferrerPolicy,
+            NoReferrerWhenDowngradePolicy,
+            SameOriginPolicy,
+            OriginPolicy,
+            StrictOriginPolicy,
+            OriginWhenCrossOriginPolicy,
+            StrictOriginWhenCrossOriginPolicy,
+            UnsafeUrlPolicy,
+            DefaultReferrerPolicy,
+        )
+    }
 
 
 LOCAL_SCHEMES: tuple[str, ...] = (
@@ -118,6 +142,8 @@ class NoReferrerPolicy(ReferrerPolicy):
 
     def referrer(self, response_url: str, request_url: str) -> str | None:
         return None
+    def referrer(self, response_url: str, request_url: str) -> str | None:
+        return None
 
 
 class NoReferrerWhenDowngradePolicy(ReferrerPolicy):
@@ -141,6 +167,8 @@ class NoReferrerWhenDowngradePolicy(ReferrerPolicy):
         if not self.tls_protected(response_url) or self.tls_protected(request_url):
             return self.stripped_referrer(response_url)
         return None
+    def referrer(self, response_url: str, request_url: str) -> str | None:
+        return None
 
 
 class SameOriginPolicy(ReferrerPolicy):
@@ -160,6 +188,8 @@ class SameOriginPolicy(ReferrerPolicy):
         if self.origin(response_url) == self.origin(request_url):
             return self.stripped_referrer(response_url)
         return None
+    def referrer(self, response_url: str, request_url: str) -> str | None:
+        return None
 
 
 class OriginPolicy(ReferrerPolicy):
@@ -176,6 +206,8 @@ class OriginPolicy(ReferrerPolicy):
 
     def referrer(self, response_url: str, request_url: str) -> str | None:
         return self.origin_referrer(response_url)
+    def referrer(self, response_url: str, request_url: str) -> str | None:
+        return None
 
 
 class StrictOriginPolicy(ReferrerPolicy):
@@ -201,6 +233,8 @@ class StrictOriginPolicy(ReferrerPolicy):
         ) or not self.tls_protected(response_url):
             return self.origin_referrer(response_url)
         return None
+    def referrer(self, response_url: str, request_url: str) -> str | None:
+        return None
 
 
 class OriginWhenCrossOriginPolicy(ReferrerPolicy):
@@ -222,6 +256,8 @@ class OriginWhenCrossOriginPolicy(ReferrerPolicy):
         if origin == self.origin(request_url):
             return self.stripped_referrer(response_url)
         return origin
+    def referrer(self, response_url: str, request_url: str) -> str | None:
+        return None
 
 
 class StrictOriginWhenCrossOriginPolicy(ReferrerPolicy):
@@ -254,6 +290,8 @@ class StrictOriginWhenCrossOriginPolicy(ReferrerPolicy):
         ) or not self.tls_protected(response_url):
             return self.origin_referrer(response_url)
         return None
+    def referrer(self, response_url: str, request_url: str) -> str | None:
+        return None
 
 
 class UnsafeUrlPolicy(ReferrerPolicy):
@@ -274,6 +312,8 @@ class UnsafeUrlPolicy(ReferrerPolicy):
 
     def referrer(self, response_url: str, request_url: str) -> str | None:
         return self.stripped_referrer(response_url)
+    def referrer(self, response_url: str, request_url: str) -> str | None:
+        return None
 
 
 class DefaultReferrerPolicy(NoReferrerWhenDowngradePolicy):
@@ -285,6 +325,8 @@ class DefaultReferrerPolicy(NoReferrerWhenDowngradePolicy):
 
     NOREFERRER_SCHEMES: tuple[str, ...] = (*LOCAL_SCHEMES, "file", "s3")
     name: str = POLICY_SCRAPY_DEFAULT
+    def referrer(self, response_url: str, request_url: str) -> str | None:
+        return None
 
 
 _policy_classes: dict[str, type[ReferrerPolicy]] = {
@@ -328,6 +370,28 @@ def _load_policy_class(
             raise RuntimeError(msg)
         warnings.warn(msg, RuntimeWarning)
         return None
+
+def _uncached_load_policy_class(policy: str, warning_only: bool = False) -> type[ReferrerPolicy] | None:
+    policy_lower = policy.lower()
+    tokens = [token.strip() for token in policy_lower.split(",")]
+    for token in tokens[::-1]:
+        if token in _policy_classes:
+            return _policy_classes[token]
+    msg = f"Could not load referrer policy {policy!r}"
+    if not warning_only:
+        raise RuntimeError(msg)
+    warnings.warn(msg, RuntimeWarning)
+    return None
+
+@functools.lru_cache(maxsize=32)
+def _cached_policy_class(policy: str) -> type[ReferrerPolicy] | None:
+    # This function only handles the standard string resolution.
+    policy_lower = policy.lower()
+    tokens = [token.strip() for token in policy_lower.split(",")]
+    for token in tokens[::-1]:
+        if token in _policy_classes:
+            return _policy_classes[token]
+    return None
 
 
 class RefererMiddleware(BaseSpiderMiddleware):

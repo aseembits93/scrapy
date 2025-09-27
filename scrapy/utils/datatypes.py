@@ -83,7 +83,13 @@ class CaselessDict(dict):
         return dict.get(self, self.normkey(key), self.normvalue(def_val))
 
     def setdefault(self, key: AnyStr, def_val: Any = None) -> Any:
-        return dict.setdefault(self, self.normkey(key), self.normvalue(def_val))  # type: ignore[arg-type]
+        # Optimization: avoid repeating normkey/normvalue normalization
+        k = self.normkey(key)
+        if k in self:
+            return self[k]
+        v = self.normvalue(def_val)
+        self[k] = v
+        return v
 
     # doesn't fully implement MutableMapping.update()
     def update(self, seq: Mapping[AnyStr, Any] | Iterable[tuple[AnyStr, Any]]) -> None:  # type: ignore[override]
