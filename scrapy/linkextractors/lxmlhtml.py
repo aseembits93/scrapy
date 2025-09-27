@@ -192,9 +192,12 @@ class LxmlLinkExtractor:
         )
         self.allow_res: list[re.Pattern[str]] = self._compile_regexes(allow)
         self.deny_res: list[re.Pattern[str]] = self._compile_regexes(deny)
-
+        
         self.allow_domains: set[str] = set(arg_to_iter(allow_domains))
         self.deny_domains: set[str] = set(arg_to_iter(deny_domains))
+        # Precompute lowercased versions for url matching
+        self._allow_domains_lower: set[str] = set(d.lower() for d in self.allow_domains)
+        self._deny_domains_lower: set[str] = set(d.lower() for d in self.deny_domains)
 
         self.restrict_xpaths: tuple[str, ...] = tuple(arg_to_iter(restrict_xpaths))
         self.restrict_xpaths += tuple(
@@ -235,9 +238,10 @@ class LxmlLinkExtractor:
         return not self.restrict_text or _matches(link.text, self.restrict_text)
 
     def matches(self, url: str) -> bool:
-        if self.allow_domains and not url_is_from_any_domain(url, self.allow_domains):
+        # Use precomputed lowercased domain sets
+        if self._allow_domains_lower and not url_is_from_any_domain(url, self._allow_domains_lower):
             return False
-        if self.deny_domains and url_is_from_any_domain(url, self.deny_domains):
+        if self._deny_domains_lower and url_is_from_any_domain(url, self._deny_domains_lower):
             return False
 
         allowed = (
