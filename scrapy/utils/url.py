@@ -19,6 +19,36 @@ from w3lib.url import parse_url as _parse_url
 
 from scrapy.exceptions import ScrapyDeprecationWarning
 
+_url_scheme_re = re.compile(r"^\w+://", flags=re.IGNORECASE)
+
+_posix_path_re = re.compile(
+    r"""
+    ^                   # start with...
+    (
+        \.              # ...a single dot,
+        (
+            \. | [^/\.]+  # optionally followed by
+        )?                # either a second dot or some characters
+        |
+        ~   # $HOME
+    )?      # optional match of ".", ".." or ".blabla"
+    /       # at least one "/" for a file path,
+    .       # and something after the "/"
+    """,
+    flags=re.VERBOSE,
+)
+
+_windows_path_re = re.compile(
+    r"""
+    ^
+    (
+        [a-z]:\\
+        | \\\\
+    )
+    """,
+    flags=re.IGNORECASE | re.VERBOSE,
+)
+
 
 def __getattr__(name: str):
     if name in ("_unquotepath", "_safe_chars", "parse_url", *_public_w3lib_objects):
@@ -97,7 +127,7 @@ def escape_ajax(url: str) -> str:
 
 def add_http_if_no_scheme(url: str) -> str:
     """Add http as the default scheme if it is missing from the url."""
-    match = re.match(r"^\w+://", url, flags=re.IGNORECASE)
+    match = _url_scheme_re.match(url)
     if not match:
         parts = urlparse(url)
         scheme = "http:" if parts.netloc else "http://"
@@ -145,7 +175,7 @@ def _is_windows_path(string: str) -> bool:
 
 
 def _is_filesystem_path(string: str) -> bool:
-    return _is_posix_path(string) or _is_windows_path(string)
+    return bool(_posix_path_re.match(string)) or bool(_windows_path_re.match(string))
 
 
 def guess_scheme(url: str) -> str:
