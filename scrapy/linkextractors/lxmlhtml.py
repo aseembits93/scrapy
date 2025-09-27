@@ -8,7 +8,7 @@ import logging
 import operator
 import re
 from collections.abc import Callable, Iterable
-from functools import partial
+from functools import lru_cache, partial
 from typing import TYPE_CHECKING, Any, Union, cast
 from urllib.parse import urljoin, urlparse
 
@@ -54,7 +54,11 @@ def _identity(x: Any) -> Any:
 
 
 def _canonicalize_link_url(link: Link) -> str:
-    return canonicalize_url(link.url, keep_fragments=True)
+    return _canonicalize_url(link.url)
+
+@lru_cache(maxsize=4096)
+def _canonicalize_url(url: str) -> str:
+    return canonicalize_url(url, keep_fragments=True)
 
 
 class LxmlParserLinkExtractor:
