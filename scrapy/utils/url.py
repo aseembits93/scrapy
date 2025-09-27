@@ -45,8 +45,18 @@ def url_is_from_any_domain(url: UrlT, domains: Iterable[str]) -> bool:
     host = _parse_url(url).netloc.lower()
     if not host:
         return False
-    domains = [d.lower() for d in domains]
-    return any((host == d) or (host.endswith(f".{d}")) for d in domains)
+    # If domains is a set, assume all items are already lowercased; otherwise build a set of lowercased strings.
+    if not isinstance(domains, set):
+        domains = set(d.lower() for d in domains)
+    # Short-circuit lookup via direct set membership; also check subdomain match efficiently.
+    if host in domains:
+        return True
+    # Fast path for subdomain match: ".example.com" in domains?
+    # Only check for domains that could be at the suffix position.
+    for d in domains:
+        if host.endswith(f".{d}"):
+            return True
+    return False
 
 
 def url_is_from_spider(url: UrlT, spider: type[Spider]) -> bool:
