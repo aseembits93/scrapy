@@ -42,15 +42,21 @@ UrlT = Union[str, bytes, ParseResult]
 
 def url_is_from_any_domain(url: UrlT, domains: Iterable[str]) -> bool:
     """Return True if the url belongs to any of the given domains"""
-    host = _parse_url(url).netloc.lower()
+    host = _parse_url(url).netloc
     if not host:
         return False
-    domains = [d.lower() for d in domains]
-    return any((host == d) or (host.endswith(f".{d}")) for d in domains)
+    host = host.lower()
+    domains_iter = iter(domains)
+    for d in domains_iter:
+        d_lower = d.lower()
+        if host == d_lower or host.endswith(f".{d_lower}"):
+            return True
+    return False
 
 
 def url_is_from_spider(url: UrlT, spider: type[Spider]) -> bool:
     """Return True if the url belongs to the given spider"""
+    # 'spider.name' is usually already lowercase, as are allowed_domains, so let url_is_from_any_domain handle normalization
     return url_is_from_any_domain(
         url, [spider.name, *getattr(spider, "allowed_domains", [])]
     )
