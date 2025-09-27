@@ -49,9 +49,11 @@ def deprecated(
 def defers(func: Callable[_P, _T]) -> Callable[_P, Deferred[_T]]:
     """Decorator to make sure a function always returns a deferred"""
 
-    @wraps(func)
     def wrapped(*a: _P.args, **kw: _P.kwargs) -> Deferred[_T]:
         return maybeDeferred(func, *a, **kw)
+
+    wrapped.__name__ = func.__name__  # type: ignore
+    wrapped.__doc__ = func.__doc__
 
     return wrapped
 
