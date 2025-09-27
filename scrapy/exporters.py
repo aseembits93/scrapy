@@ -62,7 +62,9 @@ class BaseItemExporter(ABC):
     def serialize_field(
         self, field: Mapping[str, Any] | Field, name: str, value: Any
     ) -> Any:
-        serializer: Callable[[Any], Any] = field.get("serializer", lambda x: x)
+        serializer = field.get("serializer")
+        if serializer is None:
+            return value
         return serializer(value)
 
     def start_exporting(self) -> None:  # noqa: B027
