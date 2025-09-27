@@ -276,6 +276,19 @@ def get_spec(func: Callable[..., Any]) -> tuple[list[str], dict[str, Any]]:
     """
 
     if inspect.isfunction(func) or inspect.ismethod(func):
+        code = getattr(func, "__code__", None)
+        if code is not None:
+            argcount = code.co_argcount
+            argnames = list(code.co_varnames[:argcount])
+            defaults = getattr(func, "__defaults__", None)
+            if defaults is None:
+                args = argnames
+                kwargs = {}
+            else:
+                firstdefault = argcount - len(defaults)
+                args = argnames[:firstdefault]
+                kwargs = {name: default for name, default in zip(argnames[firstdefault:], defaults)}
+            return args, kwargs
         spec = inspect.getfullargspec(func)
     elif hasattr(func, "__call__"):  # noqa: B004
         spec = inspect.getfullargspec(func.__call__)
