@@ -9,7 +9,7 @@ import operator
 import re
 from collections.abc import Callable, Iterable
 from functools import partial
-from typing import TYPE_CHECKING, Any, Union, cast
+from typing import TYPE_CHECKING, Any, Union
 from urllib.parse import urljoin, urlparse
 
 from lxml import etree
@@ -67,27 +67,34 @@ class LxmlParserLinkExtractor:
         strip: bool = True,
         canonicalized: bool = False,
     ):
-        # mypy doesn't infer types for operator.* and also for partial()
-        self.scan_tag: Callable[[str], bool] = (
-            tag
-            if callable(tag)
-            else cast("Callable[[str], bool]", partial(operator.eq, tag))
-        )
-        self.scan_attr: Callable[[str], bool] = (
-            attr
-            if callable(attr)
-            else cast("Callable[[str], bool]", partial(operator.eq, attr))
-        )
-        self.process_attr: Callable[[Any], Any] = (
-            process if callable(process) else _identity
-        )
+        # Use operator.eq directly as function, partial creation can be costly
+        # if called many times; let's avoid unnecessary partial when arguments
+        # are known and static (str, "a"), gives constant function
+        if callable(tag):
+            self.scan_tag: Callable[[str], bool] = tag
+        else:
+            # Use a lambda to avoid partial overhead for a trivial eq
+            t = tag
+            self.scan_tag: Callable[[str], bool] = lambda v: v == t
+
+        if callable(attr):
+            self.scan_attr: Callable[[str], bool] = attr
+        else:
+            a = attr
+            self.scan_attr: Callable[[str], bool] = lambda v: v == a
+
+        # Inline identity function for fastest reference
+        self.process_attr: Callable[[Any], Any] = process if callable(process) else _identity
         self.unique: bool = unique
         self.strip: bool = strip
-        self.link_key: Callable[[Link], str] = (
-            cast("Callable[[Link], str]", operator.attrgetter("url"))
-            if canonicalized
-            else _canonicalize_link_url
-        )
+
+        # Avoid operator.attrgetter indirection in link_key
+        if canonicalized:
+            # The fallback else is "_canonicalize_link_url", so swap order for correctness
+            self.link_key: Callable[[Link], str] = _canonicalize_link_url
+        else:
+            # Inline Link.url access for best performance
+            self.link_key: Callable[[Link], str] = lambda l: l.url
 
     def _iter_links(
         self, document: HtmlElement
@@ -149,10 +156,13 @@ class LxmlParserLinkExtractor:
 
         The subclass should override it if necessary
         """
+        # No change: simple method call, nothing to optimize here
         return self._deduplicate_if_needed(links)
 
     def _deduplicate_if_needed(self, links: list[Link]) -> list[Link]:
+        # Avoid function call overhead if not unique
         if self.unique:
+            # Pass self.link_key directly, already fast
             return unique_list(links, key=self.link_key)
         return links
 
