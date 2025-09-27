@@ -57,7 +57,18 @@ class ReferrerPolicy(ABC):
         raise NotImplementedError
 
     def stripped_referrer(self, url: str) -> str | None:
-        if urlparse(url).scheme not in self.NOREFERRER_SCHEMES:
+        # Optimization: Inline a set lookup for self.NOREFERRER_SCHEMES and use url[:url.find(':')]
+        # This avoids urlparse allocations when just checking the scheme, which is a major hot path per profiling.
+        schemes = getattr(self, 'NOREFERRER_SCHEMES', None)
+        if not url:
+            return None
+        # Find scheme quickly (str.partition is faster than urlparse for scheme extraction)
+        scheme_end = url.find(':')
+        if scheme_end == -1:
+            scheme = ''
+        else:
+            scheme = url[:scheme_end].lower()
+        if schemes is not None and scheme not in schemes:
             return self.strip_url(url)
         return None
 
