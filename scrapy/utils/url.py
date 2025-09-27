@@ -19,6 +19,34 @@ from w3lib.url import parse_url as _parse_url
 
 from scrapy.exceptions import ScrapyDeprecationWarning
 
+_POSIX_PATH_RE = re.compile(
+    r"""
+    ^                   # start with...
+    (
+        \.              # ...a single dot,
+        (
+            \. | [^/\.]+  # optionally followed by
+        )?                # either a second dot or some characters
+        |
+        ~   # $HOME
+    )?      # optional match of ".", ".." or ".blabla"
+    /       # at least one "/" for a file path,
+    .       # and something after the "/"
+    """,
+    flags=re.VERBOSE,
+)
+
+_WINDOWS_PATH_RE = re.compile(
+    r"""
+    ^
+    (
+        [a-z]:\\
+        | \\\\
+    )
+    """,
+    flags=re.IGNORECASE | re.VERBOSE,
+)
+
 
 def __getattr__(name: str):
     if name in ("_unquotepath", "_safe_chars", "parse_url", *_public_w3lib_objects):
@@ -107,41 +135,11 @@ def add_http_if_no_scheme(url: str) -> str:
 
 
 def _is_posix_path(string: str) -> bool:
-    return bool(
-        re.match(
-            r"""
-            ^                   # start with...
-            (
-                \.              # ...a single dot,
-                (
-                    \. | [^/\.]+  # optionally followed by
-                )?                # either a second dot or some characters
-                |
-                ~   # $HOME
-            )?      # optional match of ".", ".." or ".blabla"
-            /       # at least one "/" for a file path,
-            .       # and something after the "/"
-            """,
-            string,
-            flags=re.VERBOSE,
-        )
-    )
+    return _POSIX_PATH_RE.match(string) is not None
 
 
 def _is_windows_path(string: str) -> bool:
-    return bool(
-        re.match(
-            r"""
-            ^
-            (
-                [a-z]:\\
-                | \\\\
-            )
-            """,
-            string,
-            flags=re.IGNORECASE | re.VERBOSE,
-        )
-    )
+    return _WINDOWS_PATH_RE.match(string) is not None
 
 
 def _is_filesystem_path(string: str) -> bool:
