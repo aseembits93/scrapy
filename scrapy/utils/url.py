@@ -19,6 +19,8 @@ from w3lib.url import parse_url as _parse_url
 
 from scrapy.exceptions import ScrapyDeprecationWarning
 
+_scheme_re = re.compile(r"^\w+://", re.IGNORECASE)
+
 
 def __getattr__(name: str):
     if name in ("_unquotepath", "_safe_chars", "parse_url", *_public_w3lib_objects):
@@ -97,8 +99,7 @@ def escape_ajax(url: str) -> str:
 
 def add_http_if_no_scheme(url: str) -> str:
     """Add http as the default scheme if it is missing from the url."""
-    match = re.match(r"^\w+://", url, flags=re.IGNORECASE)
-    if not match:
+    if not _scheme_re.match(url):
         parts = urlparse(url)
         scheme = "http:" if parts.netloc else "http://"
         url = scheme + url
