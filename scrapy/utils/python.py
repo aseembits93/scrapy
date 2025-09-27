@@ -210,7 +210,9 @@ def binary_is_text(data: bytes) -> bool:
     """
     if not isinstance(data, bytes):
         raise TypeError(f"data must be bytes, got '{type(data).__name__}'")
-    return all(c not in _BINARYCHARS for c in data)
+    if not data:
+        return True
+    return set(data).isdisjoint(_BINARYCHARS)
 
 
 def get_func_args_dict(
